@@ -1,0 +1,33 @@
+Sploit 5:
+After mallocing again with length BUFLEN*2 in target5.c (line 32), block a controls the area in memory where block b used to exist.
+We take advantage of this by overwriting the areas in memory where the left and right pointers of block b used to exist with the address of a
+(the beginning of our buffer) and the address of the return address of foo respectively. In order for coalescing to occur, which will allow us 
+to eventually execute our shellcode, we need to set the free bit (5th byte) of our left chunk (our buffer) to 0x1 since it is acting as a
+fake freed block in the heap. Now, on line 40, when the target5.c erroneously calls free again on block b, it sees the free bit we inserted in
+our fake block and coalescing occurs. Focusing on lines 108 and 113 in the coalescing section of tfree mentioned in quiz section, 
+we see that setting q = p->s.l and then setting p->s.r->s.l=q is equivalent to saying we set the value stored at the address in p's right pointer
+to p's left pointer. In our case, p is b, so this essentially means we set the value found at address of the return address of foo to the address of our attack buffer.
+Thus, when foo returns on line 42, it successfully goes to the beginning our buffer. Now, since we treat the first 8 bytes of our buffer as pointers, 
+we insert a jump instruction in our left pointer, so that when the code reaches the beginning of our buffer, it jumps to the start of our shellcode and executes.
+
+Sploit 6:
+When we call snprintf, printf's internal stack pointer points to the end of foo's stack frame, which is the beginning of the local variable buf. 
+Since addresses are extremely large, we can't overwrite the return address of foo all at once, so we break it down into bytes. 
+By alternating a dummy int (0xAA..) and a byte of foo's return address (0xff...), we set up our buffer appropriately before we introducing our format specifiers.
+At the end, we will have set the first 28 bytes of our buffer (we don't need a dummy int for the most significant byte of foo's return address since it is the
+same as the second most significant byte of foo's return address (0xff)). The next 21 bytes of our buffer will be format specifiers. For our format specifiers,
+we use a combination of %__d and %n. The %__d will print our dummy int padded to a specific number of characters, which will correspond to a given byte of the 
+address we want to overwrite foo's return address with, and the %n will interpret the next 4 bytes in our buffer (an address to some byte in foo's return address) 
+as an int pointer and set it to the number bytes that have been printed. In this case, the address we want to overwrite foo's return address with is &buf 
+(local variable in foo) + 255 because the last two bytes are overridden with 0xff (255), which means when we are writing to the most significant byte of foo's return
+address we have printed 255 bytes. Thus, the logical place to put out attack buffer is right after that. Once we have completed the format specifier string, which
+looks something like "%79d%n%113d%n%35d%n%n", we can memcpy our shellcode right after. Altogether, with the initial 28 bytes of padding and addresses and the 21 bytes
+of format specifiers, we will have a written 255 bytes into the local variable buf in foo and then with the memcpy, we will have written our shellcode after that, resulting in a successful exploit.
+
+Sploit 7:
+In a similar yet different fashion to sploit 2, we overwrite the least significant byte of bar's frame pointer so that it points back to itself.
+Consequently, when bar returns back to foo, our frame pointer will remain at bar. Looking at foo's stack frame, we know p and a are right after its frame pointer, so
+if foo's frame pointer was at bar's, then it would refer to the subsequent 8 bytes as p and a sequentially. This corresponds to the beginning of buf in bar. Thus,
+using our attack buffer again, we set the 4 bytes after bar's frame pointer to the address of the exit function (p), the 4 bytes after that to address of our buffer
+(a), and the remaining bytes to our shellcode. This results in the execution of our shellcode due to the fact on line 34 we set the address of the exit function stored
+in p to point to the address of our attack buffer (a) that contains the shellcode.
