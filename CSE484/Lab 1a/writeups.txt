@@ -1,0 +1,11 @@
+Sploit 1:
+In a similar fashion to sploit 0, the issue we found in target1 was the use of strcpy. Since strcpy has no bounds checking, we were able to take advantage of this and overflow the stack buffer in foo. We began by coping over our shellcode into the buffer, and then, we overwrote the return pointer on the stack to return to the beginning of the buffer rather than main, so we can execute our shellcode.
+
+Sploit 2:
+Since nstrcpy checks up to BUFLEN + 1, we can still overflow the stack buffer in bar. Again, we began by coping over our shellcode into the buffer; however, this time we only overwrite the least significant byte of EBP (old frame pointer stored in bar). Thus, when bar returns, it will continue execution and return to foo (like normal), but bar’s frame pointer will point to the address 8 bytes before the end of our buffer, acting like a fake stack frame pointer. As a result, when the program looks at the 4 bytes after the fake stack frame pointer, they’ll find the return address of our buffer that we placed  and execute our shellcode.
+
+Sploit 3:
+For sploit 3, we again overflow the stack buffer in bar by 1. Since there is no frame pointer (ebp), the next four bytes after the buffer are the return pointer, so we can directly manipulate it. Consequently, by a 1-byte overwrite, we can modify the return address to point to our buffer, copy our shellcode into the buffer, and then execute our shellcode.
+
+Sploit 4:
+Here, we draw on the fact that the length of our buffer is stored in a signed short (arglen). We create a buffer of a length that is so large it causes an overflow in arglen (0x8000), making it negative. This allows the memcpy to occur since arglen is now less than BUFLEN, so we pass the conditional. The rest is just like sploit 0/1. We fill the buffer with our shellcode, and we overwrite the return pointer with the address of the stack buffer, so we can execute our shellcode.
